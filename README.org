@@ -1,0 +1,13 @@
+# appraiser
+
+appraiser.scripter - a DSL for testing Ring handlers
+
+## Usage
+
+see appraiser.test.* for examples
+
+## License
+
+Copyright (C) 2011 Jim Duey
+
+Distributed under the Eclipse Public License, the same as Clojure.
