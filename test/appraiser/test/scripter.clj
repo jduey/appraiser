@@ -24,8 +24,7 @@
 (deftest test-not-found-route
          (script app
                  [_ (click "/wrong")
-                  _ (response-code? 404)]
-                 true))
+                  _ (response-code? 404)]))
 
 (def hit-counter
   (as-script
@@ -42,6 +41,5 @@
                   _ (body-contains? "counter: 2")
 
                   _ hit-counter
-                  _ (body-contains? "counter: 3")]
-                 true))
+                  _ (body-contains? "counter: 3")]))
 

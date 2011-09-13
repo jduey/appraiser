@@ -103,5 +103,6 @@
   [handler & steps]
    `((clojure.contrib.monads/domonad
        appraiser.scripter/script-m 
-       ~@steps)
+       ~@steps
+       true)
        {:handler ~handler}))
