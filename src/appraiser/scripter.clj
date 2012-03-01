@@ -1,80 +1,67 @@
 (ns appraiser.scripter
-  (:use [clojure.test])
-  (:require [clojure.contrib.monads :as m]))
+  (:use [clojure.algo.monads :only [domonad m-seq state-t set-val
+                                    fetch-val maybe-m with-monad]]))
 
-(def script-m (m/state-t m/maybe-m))
+(def script-m (state-t maybe-m))
 
-(defmacro as-script
-  "A shorthand for 'domonad script-m'"
-  [& body]
-  `(clojure.contrib.monads/domonad appraiser.scripter/script-m ~@body))
+(defn script [& lines]
+  (with-monad script-m
+                (m-seq lines)))
 
-(defn set-val
-  "Set a key 'k' in the state to a value 'v'"
-  [k v]
+(defmacro script-let [bindings body]
+  `(domonad script-m ~bindings ~body))
+
+(defn update-val
+  "Set a key 'k' in the state to the result of applying
+  'f' to the current value of 'k' and additional arguments."
+  [k f & args]
   (fn [state]
-    (let [new-state (assoc state k v)]
+    (let [new-state (apply update-in state [k] f args)]
       [new-state new-state])))
 
-(defn get-val
-  "Retrieve the value associated with key 'k' in the state"
-  [k]
-  (fn [state]
-    [(get state k) state]))
-
-(defn body-contains?
-  "Tests whether the body of the most recent response contains the
-   string 'strn'. Uses 'is' from clojure.test."
-  [strn]
-  (as-script
-    [result (get-val :response)]
-    (is (.contains (:body result) strn)
-        (format "Expected body to contain \"%s\"" strn))))
-
-(defn response-code?
-  "Tests whether the most recent response code is 'code' or not.
-   Uses 'is' from clojure.test."
-  [code]
-  (as-script
-    [response (get-val :response)]
-    (is (= code (:status response))
-        (format "Unexpected response code. Expected: %s" code))))
+(def get-val fetch-val)
 
 (defn- get-handler [state]
-  (let [handler (:handler state)]
-    (when-not handler
-      (throw (Exception. "could not get handler")))
-    [handler state]))
+  (if-let [handler (:handler state)]
+    [handler state]
+    (throw (Exception. "could not get handler"))))
 
 (defn- response-cookies [state]
-  (let [cookies (->> state
-                  :response
-                  :headers
-                  (#(get % "Set-Cookie"))
+  (let [cookies (->> (get-in state [:response :headers "Set-Cookie"]) 
                   (map #(let [[k v] (.split % "=")]
                           [k {:value v}]))
                   (into {}))]
     [cookies state]))
 
 (def set-cookies
-  (as-script
+  (script-let
     [cookies response-cookies
-     _ (set-val :cookies cookies)]
+     _ (update-val :cookies merge cookies)]
     cookies))
+
+(defn request [method url req-map]
+  (let [method (->> method
+                 name
+                 .toLowerCase
+                 keyword)]
+    (script-let
+      [handler get-handler
+       cookies (get-val :cookies)
+       :let [request (assoc req-map
+                            :request-method method
+                            :uri url
+                            :cookies cookies)
+             result (handler request)]
+       _ set-cookies
+       _ (set-val :response result)]
+      result)))
 
 (defn click
   "Simulate the clicking of a link on a webpage. An optional
   query string may be provided."
   [url & [query-string]]
-  (as-script
-    [handler get-handler
-     cookies (get-val :cookies)
-     :let [result (handler {:request-method :get
-                            :uri url
-                            :cookies cookies
-                            :query-string query-string})]
-     _ (set-val :response result)
-     _ set-cookies]
+  (script-let
+    [result (request :get url {:query-string query-string})]
     result))
 
 (defn submit
@@ -84,7 +71,7 @@
   values."
   [method url field-vals]
   (let [method (keyword (.toLowerCase (name method)))]
-    (as-script
+    (script-let
       [handler get-handler
        cookies (get-val :cookies)
        :let [result (handler {:request-method method
@@ -98,11 +85,27 @@
        _ set-cookies]
       result)))
 
-(defmacro script
-  "Define a script to be run to test a particular Ring handler."
-  [handler & steps]
-   `((clojure.contrib.monads/domonad
-       appraiser.scripter/script-m 
-       ~@steps
-       true)
-       {:handler ~handler}))
+(defn body-contains?
+  "Tests whether the body of the most recent response contains the
+   string 'strn'."
+  [strn]
+  (script-let
+    [response (get-val :response)
+     :when (.contains (:body response) strn)]
+    true))
+
+(defn response-code?
+  "Tests whether the most recent response code is 'code' or not."
+  [code]
+  (script-let
+    [response (get-val :response)
+     :when (= code (:status response))]
+    true))
+
+(defn run-script
+  "Run a script to test a particular Ring handler."
+  [handler script]
+  (-> (script {:handler handler})
+    first   ;; discard the final state
+    last    ;; get the value returned from the last action
+    boolean))  ;; convert it to a boolean

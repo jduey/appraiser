@@ -22,24 +22,39 @@
   (handler/site main-routes))
 
 (deftest test-not-found-route
-         (script app
-                 [_ (click "/wrong")
-                  _ (response-code? 404)]))
+         (is (run-script app
+                         (script
+                           (click "/wrong")
+                           (response-code? 404)))))
 
 (def hit-counter
-  (as-script
-    [_ (click "/")
-     _ (response-code? 200)]
-    nil))
+  (script
+    (click "/")
+    (response-code? 200)))
 
 (deftest test-counter
-         (script app
-                 [_ hit-counter
-                  _ (body-contains? "counter: 1")
+         (let [test-script (script
+                             hit-counter
+                             (body-contains? "counter: 1")
 
-                  _ hit-counter
-                  _ (body-contains? "counter: 2")
+                             hit-counter
+                             (body-contains? "counter: 2")
 
-                  _ hit-counter
-                  _ (body-contains? "counter: 3")]))
+                             hit-counter
+                             (body-contains? "counter: 3"))]
+         (is (run-script app test-script))))
+
+(deftest test-failure
+         (let [test-script (script
+                             hit-counter
+                             (body-contains? "counter: 1")
+
+                             hit-counter
+                             (body-contains? "counter: 5")
+
+                             hit-counter
+                             (body-contains? "counter: 3"))]
+         (reset! counter 0) 
+         (is (not
+               (run-script app test-script)))))
 
