@@ -39,7 +39,7 @@
      _ (update-val :cookies merge cookies)]
     cookies))
 
-(defn request [method url req-map]
+(defn request [method url & [req-map]]
   (let [method (->> method
                  name
                  .toLowerCase
@@ -52,8 +52,8 @@
                             :uri url
                             :cookies cookies)
              result (handler request)]
-       _ set-cookies
-       _ (set-val :response result)]
+       _ (set-val :response result)
+       _ set-cookies]
       result)))
 
 (defn click
