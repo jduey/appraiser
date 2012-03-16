@@ -1,6 +1,7 @@
 # appraiser
 
 appraiser.scripter - a DSL for testing Ring handlers
+appraiser.forms - a DSL for web forms that are automatically populated from database record
 
 ## Usage
 
