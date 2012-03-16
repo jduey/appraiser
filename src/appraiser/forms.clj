@@ -33,6 +33,27 @@
   (fn [frm]
     [nil (update-in frm [:prepares] conj prep-fn)]))
 
+(defn- html-generator
+  "Add a function to generate a piece of html for the form. 'html-fn'
+  expects a hash map of field keys to values."
+  [html-fn]
+  (fn [frm]
+    [nil (update-in frm [::html-fn] conj html-fn)]))
+
+(defn- decoder
+  "Add a function to decode a field coming from the form. 'decode-fn'
+  expects a hash map of form fields to form values."
+  [decode-fn]
+  (fn [frm]
+    [nil (update-in frm [::decoders] conj decode-fn)]))
+
+(defn- field
+  "Add a function to decode a field coming from the form. 'decode-fn'
+  expects a hash map of form fields to form values."
+  [field-key]
+  (fn [frm]
+    [nil (update-in frm [::fields] conj field-key)]))
+
 (defmacro fields
   "Compose multiple fields into one field-like item."
   [& body]
@@ -97,27 +118,6 @@
 (def div (partial html-block :div))
 (def para (partial html-block :p))
 (def span (partial html-block :span))
-
-(defn- html-generator
-  "Add a function to generate a piece of html for the form. 'html-fn'
-  expects a hash map of field keys to values."
-  [html-fn]
-  (fields
-    (update-val ::html-fn conj html-fn)))
-
-(defn- decoder
-  "Add a function to decode a field coming from the form. 'decode-fn'
-  expects a hash map of form fields to form values."
-  [decode-fn]
-  (fields
-    (update-val ::decoders conj decode-fn)))
-
-(defn- field
-  "Add a function to decode a field coming from the form. 'decode-fn'
-  expects a hash map of form fields to form values."
-  [field-key]
-  (fields
-    (update-val ::fields conj field-key)))
 
 (defn raw-text
   "Insert literal text into html."
